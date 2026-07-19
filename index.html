@@ -369,11 +369,21 @@
   $('customChars').oninput = () => requestGenerate();
 
   /* ── генерация ASCII ── */
+  /* соотношение ширина/высота знакоместа при текущей типографике:
+     от него зависит число строк, чтобы картинка сохраняла пропорции */
+  function cellAspect(){
+    const size = +$('fsize').value;
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.font = $('fweight').value + ' ' + size + 'px ' + $('font').value;
+    const w = ctx.measureText('M').width + +$('lspace').value;
+    const h = size * (+$('lheight').value / 100);
+    return (w > 0 && h > 0) ? w / h : 0.5;
+  }
   function generate(){
     const img = state.img;
     if(!img) return;
     const cols = +$('cols').value;
-    const rows = Math.max(1, Math.round(cols * (img.naturalHeight / img.naturalWidth) * 0.5));
+    const rows = Math.max(1, Math.round(cols * (img.naturalHeight / img.naturalWidth) * cellAspect()));
     const cv = document.createElement('canvas');
     cv.width = cols; cv.height = rows;
     const ctx = cv.getContext('2d', { willReadFrequently: true });
@@ -458,8 +468,8 @@
     inp.addEventListener('input', () => {
       const o = document.querySelector('output[for="' + inp.id + '"]');
       if(o) o.textContent = fmtVal(inp);
-      if(genInputs.includes(inp.id)) requestGenerate();
-      else applyStyle();
+      if(genInputs.includes(inp.id)){ requestGenerate(); }
+      else { applyStyle(); requestGenerate(); }   // типографика меняет знакоместо → пересчёт сетки
     });
   });
   $('invert').onchange = requestGenerate;
@@ -474,7 +484,7 @@
     out.style.color = $('fg').value;
     out.style.background = $('bg').value;
   }
-  $('font').onchange = applyStyle;
+  $('font').onchange = () => { applyStyle(); requestGenerate(); };
   $('fg').oninput = () => { applyStyle(); requestGenerate(); };
   $('bg').oninput = () => { applyStyle(); requestGenerate(); };
   $('swap').onclick = () => {
@@ -532,6 +542,7 @@
       $('font').appendChild(opt);
       $('font').value = opt.value;
       applyStyle();
+      requestGenerate();
       saveSettings();
     }catch(err){
       alert('Не удалось прочитать шрифт: ' + err.message);
