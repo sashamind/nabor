@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="ASCII-генератор из картинок, работает целиком в браузере: загрузи изображение, получи редактируемую ASCII-графику, экспортируй в TXT, PNG или SVG.">
+<meta property="og:title" content="НАБОР — ASCII-генератор из картинок">
+<meta property="og:description" content="Картинка → символы → правь как текст → скачивай. Без зависимостей, один HTML-файл.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%231B1A18'/><text x='8' y='12.5' text-anchor='middle' font-family='monospace' font-size='11' fill='%2333FF66'>@</text></svg>">
+<title>НАБОР — ASCII-генератор из картинок</title>
+<style>
+  :root{
+    --paper:#F2EFE8;
+    --ink:#1B1A18;
+    --blue:#0078BF;
+    --pink:#FF48B0;
+    --line:#D8D3C8;
+    --panel:#EBE7DD;
+    --mono:'IBM Plex Mono','SF Mono',Menlo,Consolas,'Courier New',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:var(--mono);
+    background:var(--paper);
+    color:var(--ink);
+    font-size:13px;
+    display:flex;flex-direction:column;
+    overflow:hidden;
+  }
+  /* ── header ── */
+  header{
+    display:flex;align-items:center;gap:16px;
+    padding:10px 16px;
+    border-bottom:2px solid var(--ink);
+    flex-shrink:0;
+  }
+  .logo{font-weight:700;font-size:15px;letter-spacing:.08em;white-space:nowrap}
+  .logo b{color:var(--blue)}
+  .logo i{color:var(--pink);font-style:normal}
+  .hint{color:#8a8478;font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .exports{display:flex;gap:8px}
+  button{
+    font-family:var(--mono);font-size:12px;
+    background:var(--paper);color:var(--ink);
+    border:1.5px solid var(--ink);
+    padding:6px 12px;cursor:pointer;
+    transition:background .12s,color .12s;
+  }
+  button:hover{background:var(--ink);color:var(--paper)}
+  button.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+  button.primary:hover{background:var(--ink);border-color:var(--ink)}
+  button.pink{background:var(--pink);border-color:var(--pink);color:#fff}
+  button.pink:hover{background:var(--ink);border-color:var(--ink)}
+  button:focus-visible,input:focus-visible,select:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+  /* ── layout ── */
+  .app{flex:1;display:flex;min-height:0}
+  aside{
+    width:270px;flex-shrink:0;
+    background:var(--panel);
+    border-right:1.5px solid var(--line);
+    overflow-y:auto;
+    padding-bottom:24px;
+  }
+  main{flex:1;display:flex;flex-direction:column;min-width:0}
+  /* ── controls ── */
+  .sec{border-bottom:1.5px solid var(--line);padding:12px 14px}
+  .sec h2{
+    font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--blue);margin-bottom:10px;
+  }
+  .row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}
+  .row:last-child{margin-bottom:0}
+  .row label{font-size:11.5px;color:#4a463f;white-space:nowrap}
+  .row output{font-size:11px;color:var(--ink);min-width:34px;text-align:right}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;
+    flex:1;height:2px;background:var(--ink);cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;
+    width:13px;height:13px;background:var(--blue);
+    border:1.5px solid var(--ink);border-radius:0;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:11px;height:11px;background:var(--blue);
+    border:1.5px solid var(--ink);border-radius:0;
+  }
+  select,input[type=text]{
+    font-family:var(--mono);font-size:12px;
+    background:var(--paper);color:var(--ink);
+    border:1.5px solid var(--ink);
+    padding:5px 7px;width:100%;
+  }
+  .check{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11.5px;color:#4a463f;user-select:none}
+  .check input{accent-color:var(--blue);width:14px;height:14px}
+  .color-row{display:flex;gap:8px;align-items:center}
+  input[type=color]{
+    width:34px;height:26px;padding:2px;
+    border:1.5px solid var(--ink);background:var(--paper);cursor:pointer;
+  }
+  .swap{padding:4px 8px;font-size:11px}
+  .mini{font-size:10.5px;color:#8a8478;line-height:1.5;margin-top:8px}
+  .full{width:100%;margin-top:6px}
+  /* ── preview ── */
+  .stage{
+    flex:1;overflow:auto;position:relative;
+    background:
+      repeating-linear-gradient(0deg,transparent 0 23px,rgba(0,120,191,.05) 23px 24px),
+      repeating-linear-gradient(90deg,transparent 0 23px,rgba(0,120,191,.05) 23px 24px),
+      var(--paper);
+    padding:28px;
+  }
+  #out{
+    display:inline-block;
+    white-space:pre;
+    padding:20px 24px;
+    border:1.5px solid var(--ink);
+    box-shadow:5px 5px 0 var(--pink);
+    caret-color:var(--pink);
+    min-width:200px;min-height:80px;
+    tab-size:1;
+  }
+  #out:focus{outline:none;box-shadow:5px 5px 0 var(--blue)}
+  /* ── dropzone ── */
+  #drop{
+    position:absolute;inset:28px;
+    border:2px dashed var(--ink);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    cursor:pointer;text-align:center;
+    background:var(--paper);
+    transition:background .15s;
+  }
+  #drop.over{background:#E4EEF6;border-color:var(--blue)}
+  #drop pre{font-size:10px;line-height:1;color:var(--blue);pointer-events:none;user-select:none}
+  #drop .cta{font-size:13px}
+  #drop .cta b{color:var(--pink)}
+  /* ── status bar ── */
+  .status{
+    flex-shrink:0;display:flex;align-items:center;gap:14px;
+    border-top:2px solid var(--ink);
+    padding:6px 16px;font-size:11px;color:#4a463f;
+    background:var(--panel);
+  }
+  .status .dot{width:8px;height:8px;background:var(--blue);flex-shrink:0}
+  .status.edited .dot{background:var(--pink)}
+  #regen{display:none;padding:3px 9px;font-size:10.5px}
+  .status.edited #regen{display:inline-block}
+  @media(max-width:760px){
+    .app{flex-direction:column;overflow-y:auto}
+    aside{width:100%;border-right:none;border-bottom:1.5px solid var(--line)}
+    main{min-height:60vh}
+    .hint{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">НАБОР<b>/</b>ascii<i>_</i></div>
+  <div class="hint">картинка → символы → правь как текст → скачивай</div>
+  <div class="exports">
+    <button id="copy" title="Скопировать в буфер обмена">⧉ COPY</button>
+    <button id="dl-txt" title="Скачать как .txt">.TXT</button>
+    <button id="dl-svg" title="Скачать как .svg">.SVG</button>
+    <button id="dl-png" class="primary" title="Скачать как .png">.PNG</button>
+  </div>
+</header>
+
+<div class="app">
+<aside>
+
+  <div class="sec">
+    <h2>Изображение</h2>
+    <button class="full" id="pick">Загрузить картинку…</button>
+    <input type="file" id="file" accept="image/*" hidden>
+    <button class="full" id="demo">Пример — сфера</button>
+    <p class="mini">Или перетащи файл в область справа, или вставь из буфера (Ctrl+V).</p>
+  </div>
+
+  <div class="sec">
+    <h2>Генерация</h2>
+    <div class="row"><label for="cols">Ширина, симв.</label><input type="range" id="cols" min="20" max="300" value="110"><output for="cols">110</output></div>
+    <div class="row"><label for="bright">Яркость</label><input type="range" id="bright" min="-100" max="100" value="0"><output for="bright">0</output></div>
+    <div class="row"><label for="contrast">Контраст</label><input type="range" id="contrast" min="-100" max="100" value="0"><output for="contrast">0</output></div>
+    <div class="row"><label for="gamma">Гамма</label><input type="range" id="gamma" min="30" max="300" value="100"><output for="gamma">1.0</output></div>
+    <div class="row">
+      <label class="check"><input type="checkbox" id="invert"> Инвертировать</label>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2>Символы</h2>
+    <select id="charset" aria-label="Набор символов">
+      <option value=" .:-=+*#%@">Классика · .:-=+*#%@</option>
+      <option value=" .'`^&quot;,:;Il!i&gt;&lt;~+_-?][}{1)(|\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&amp;8%B@$">Детальный (70 симв.)</option>
+      <option value=" ░▒▓█">Блоки ░▒▓█</option>
+      <option value=" .oO0@">Точки .oO0@</option>
+      <option value=" ·—/|\#">Штрихи ·—/|\#</option>
+      <option value=" 01">Бинарный 01</option>
+      <option value="custom">Свой набор ↓</option>
+    </select>
+    <input type="text" id="customChars" aria-label="Свой набор символов" placeholder="от светлого к тёмному, напр.  .растр" style="margin-top:8px;display:none">
+    <p class="mini">Порядок символов — от светлого к тёмному.</p>
+  </div>
+
+  <div class="sec">
+    <h2>Шрифт</h2>
+    <select id="font" aria-label="Шрифт">
+      <option value="'IBM Plex Mono','SF Mono',Menlo,Consolas,monospace">IBM Plex Mono / система</option>
+      <option value="'Courier New',Courier,monospace">Courier New</option>
+      <option value="Consolas,Menlo,Monaco,monospace">Consolas / Menlo</option>
+      <option value="'Lucida Console','DejaVu Sans Mono',monospace">Lucida Console</option>
+      <option value="ui-monospace,monospace">Системный моно</option>
+    </select>
+    <button class="full" id="fontPick">Загрузить свой шрифт…</button>
+    <input type="file" id="fontFile" accept=".ttf,.otf,.woff,.woff2" hidden>
+    <div class="row" style="margin-top:10px"><label for="fsize">Кегль, px</label><input type="range" id="fsize" min="4" max="26" value="10"><output for="fsize">10</output></div>
+    <div class="row"><label for="fweight">Толщина</label><input type="range" id="fweight" min="100" max="900" step="100" value="400"><output for="fweight">400</output></div>
+    <div class="row"><label for="lheight">Интерлиньяж</label><input type="range" id="lheight" min="70" max="160" value="100"><output for="lheight">1.00</output></div>
+    <div class="row"><label for="lspace">Трекинг</label><input type="range" id="lspace" min="-2" max="6" step="0.5" value="0"><output for="lspace">0</output></div>
+  </div>
+
+  <div class="sec">
+    <h2>Цвет</h2>
+    <div class="color-row">
+      <input type="color" id="fg" value="#1B1A18" title="Цвет символов" aria-label="Цвет символов">
+      <input type="color" id="bg" value="#F2EFE8" title="Цвет фона" aria-label="Цвет фона">
+      <button class="swap" id="swap" title="Поменять местами" aria-label="Поменять цвета местами">⇄</button>
+    </div>
+    <div class="color-row" style="margin-top:8px;flex-wrap:wrap">
+      <button class="swap preset" data-fg="#1B1A18" data-bg="#F2EFE8">чернила</button>
+      <button class="swap preset" data-fg="#33FF66" data-bg="#0A0F0A">терминал</button>
+      <button class="swap preset" data-fg="#0078BF" data-bg="#F2EFE8">riso&nbsp;blue</button>
+      <button class="swap preset" data-fg="#FF48B0" data-bg="#14131A">fluo&nbsp;pink</button>
+    </div>
+  </div>
+
+</aside>
+
+<main>
+  <div class="stage" id="stage">
+    <pre id="out" contenteditable="plaintext-only" spellcheck="false" aria-label="ASCII-графика, можно редактировать"></pre>
+    <div id="drop">
+      <pre id="dropArt"></pre>
+      <div class="cta">Брось картинку сюда,<br><b>кликни</b> или вставь из буфера</div>
+    </div>
+  </div>
+  <div class="status" id="statusBar">
+    <span class="dot"></span>
+    <span id="statusText">Нет изображения</span>
+    <button id="regen" class="pink">⟲ перегенерировать (правки сотрутся)</button>
+    <button id="unregen" style="display:none;padding:3px 9px;font-size:10.5px">↩ вернуть правки</button>
+  </div>
+</main>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const out = $('out'), drop = $('drop'), stage = $('stage');
+  const statusBar = $('statusBar'), statusText = $('statusText');
+
+  const state = { img: null, edited: false, customFonts: 0, snapshot: null };
+
+  /* ── анимированная ASCII-заставка в дропзоне ── */
+  const dropArt = $('dropArt');
+  const ramp = ' .:-=+*#%@';
+  let t = 0;
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function noiseFrame(){
+    const W = 46, H = 12; let s = '';
+    for(let y=0;y<H;y++){
+      for(let x=0;x<W;x++){
+        const v = (Math.sin(x*0.35 + t) + Math.cos(y*0.7 - t*0.8) + Math.sin((x+y)*0.2 + t*0.5) + 3) / 6;
+        s += ramp[Math.min(ramp.length-1, Math.max(0, Math.floor(v*ramp.length)))];
+      }
+      s += '\n';
+    }
+    dropArt.textContent = s;
+    t += 0.06;
+  }
+  noiseFrame();
+  let noiseTimer = null;
+  if(!reduceMotion){ noiseTimer = setInterval(noiseFrame, 90); }
+
+  /* ── временные сообщения в статус-баре ── */
+  let flashTimer = null;
+  function flash(msg){
+    statusText.textContent = msg;
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(updateStatus, 2500);
+  }
+
+  /* ── загрузка изображения ── */
+  function useImage(img){
+    state.img = img;
+    state.edited = false;
+    state.snapshot = null;
+    clearInterval(noiseTimer);
+    drop.style.display = 'none';
+    generate();
+  }
+  function loadImage(file){
+    if(!file) return;
+    if(!file.type.startsWith('image/')){ flash('Это не изображение: ' + (file.name || file.type || '?')); return; }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { useImage(img); URL.revokeObjectURL(url); };
+    img.onerror = () => { URL.revokeObjectURL(url); flash('Не удалось прочитать изображение'); };
+    img.src = url;
+  }
+  $('pick').onclick = () => $('file').click();
+  drop.onclick = () => $('file').click();
+  $('file').onchange = e => { loadImage(e.target.files[0]); e.target.value = ''; };
+
+  /* пример-демо: процедурная сфера */
+  $('demo').onclick = () => {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 320;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, 320, 320);
+    const g = ctx.createRadialGradient(115, 105, 15, 160, 160, 150);
+    g.addColorStop(0, '#fafafa');
+    g.addColorStop(0.65, '#7a7a7a');
+    g.addColorStop(1, '#0a0a0a');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(160, 160, 138, 0, Math.PI * 2);
+    ctx.fill();
+    const img = new Image();
+    img.onload = () => useImage(img);
+    img.src = cv.toDataURL();
+  };
+
+  ['dragover','dragenter'].forEach(ev => stage.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave','drop'].forEach(ev => stage.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  stage.addEventListener('drop', e => loadImage(e.dataTransfer.files[0]));
+  window.addEventListener('paste', e => {
+    const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
+    if(item) loadImage(item.getAsFile());
+  });
+
+  /* fallback для браузеров без contenteditable="plaintext-only" */
+  if(!out.isContentEditable){
+    out.setAttribute('contenteditable', 'true');
+    out.addEventListener('paste', e => {
+      if([...(e.clipboardData?.items || [])].some(i => i.type.startsWith('image/'))) return;
+      e.preventDefault();
+      document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
+    });
+  }
+
+  /* ── набор символов ── */
+  function currentRamp(){
+    const sel = $('charset').value;
+    if(sel === 'custom'){
+      const c = $('customChars').value;
+      return c.length >= 2 ? c : ' .:-=+*#%@';
+    }
+    return sel;
+  }
+  $('charset').onchange = () => {
+    $('customChars').style.display = $('charset').value === 'custom' ? 'block' : 'none';
+    requestGenerate();
+  };
+  $('customChars').oninput = () => requestGenerate();
+
+  /* ── генерация ASCII ── */
+  function generate(){
+    const img = state.img;
+    if(!img) return;
+    const cols = +$('cols').value;
+    const rows = Math.max(1, Math.round(cols * (img.naturalHeight / img.naturalWidth) * 0.5));
+    const cv = document.createElement('canvas');
+    cv.width = cols; cv.height = rows;
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, cols, rows);
+    const data = ctx.getImageData(0, 0, cols, rows).data;
+
+    const chars = currentRamp();
+    const n = chars.length - 1;
+    const bright = +$('bright').value / 100;          // -1..1
+    const c = +$('contrast').value / 100;             // -1..1
+    const cf = (1 + c) / (1 - Math.min(c, 0.99));     // фактор контраста
+    const gamma = +$('gamma').value / 100;
+    const inv = $('invert').checked;
+    // светлый фон → тёмные символы на светлых участках должны быть редкими:
+    // если фон светлее текста, автоматически считаем "яркое = пусто"
+    const fgL = lum(hex($('fg').value)), bgL = lum(hex($('bg').value));
+    const lightBg = bgL > fgL;
+
+    let s = '';
+    for(let y = 0; y < rows; y++){
+      for(let x = 0; x < cols; x++){
+        const i = (y * cols + x) * 4;
+        let v = (0.2126*data[i] + 0.7152*data[i+1] + 0.0722*data[i+2]) / 255;
+        const a = data[i+3] / 255;
+        v = v * a + (lightBg ? 1 : 0) * (1 - a);      // прозрачность → фон
+        v = (v - 0.5) * cf + 0.5 + bright;
+        v = Math.pow(Math.min(1, Math.max(0, v)), gamma);
+        if(inv) v = 1 - v;
+        if(lightBg) v = 1 - v;                        // на светлом фоне тёмное = плотное
+        s += chars[Math.round(v * n)];
+      }
+      s += '\n';
+    }
+    out.textContent = s;
+    state.edited = false;
+    updateStatus();
+  }
+  function hex(h){ return [1,3,5].map(i => parseInt(h.slice(i, i+2), 16)); }
+  function lum([r,g,b]){ return 0.2126*r + 0.7152*g + 0.0722*b; }
+
+  /* авто-перегенерация с защитой ручных правок */
+  let genTimer = null;
+  function requestGenerate(){
+    if(!state.img) return;
+    if(state.edited){ updateStatus(); return; }        // не затираем правки молча
+    clearTimeout(genTimer);
+    genTimer = setTimeout(generate, 60);
+  }
+  $('regen').onclick = () => { state.snapshot = out.innerText; state.edited = false; generate(); };
+  $('unregen').onclick = () => {
+    out.innerText = state.snapshot;
+    state.snapshot = null;
+    state.edited = true;
+    updateStatus();
+  };
+
+  out.addEventListener('input', () => { state.edited = true; state.snapshot = null; updateStatus(); });
+
+  function updateStatus(){
+    statusBar.classList.toggle('edited', state.edited);
+    $('unregen').style.display = state.snapshot ? 'inline-block' : 'none';
+    if(!state.img){ statusText.textContent = 'Нет изображения'; return; }
+    const lines = out.innerText.replace(/\n+$/, '').split('\n');
+    const w = Math.max(...lines.map(l => l.length), 0);
+    statusText.textContent = (state.edited ? 'Отредактировано вручную · ' : '') + w + '×' + lines.length + ' симв.';
+  }
+
+  /* ── слайдеры и подписи ── */
+  const genInputs = ['cols','bright','contrast','gamma'];
+  function fmtVal(inp){
+    return inp.id === 'gamma' ? (inp.value/100).toFixed(1)
+         : inp.id === 'lheight' ? (inp.value/100).toFixed(2)
+         : inp.value;
+  }
+  function syncOutputs(){
+    document.querySelectorAll('input[type=range]').forEach(inp => {
+      const o = document.querySelector('output[for="' + inp.id + '"]');
+      if(o) o.textContent = fmtVal(inp);
+    });
+  }
+  document.querySelectorAll('input[type=range]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const o = document.querySelector('output[for="' + inp.id + '"]');
+      if(o) o.textContent = fmtVal(inp);
+      if(genInputs.includes(inp.id)) requestGenerate();
+      else applyStyle();
+    });
+  });
+  $('invert').onchange = requestGenerate;
+
+  /* ── оформление превью ── */
+  function applyStyle(){
+    out.style.fontFamily = $('font').value;
+    out.style.fontSize = $('fsize').value + 'px';
+    out.style.fontWeight = $('fweight').value;
+    out.style.lineHeight = (+$('lheight').value / 100);
+    out.style.letterSpacing = $('lspace').value + 'px';
+    out.style.color = $('fg').value;
+    out.style.background = $('bg').value;
+  }
+  $('font').onchange = applyStyle;
+  $('fg').oninput = () => { applyStyle(); requestGenerate(); };
+  $('bg').oninput = () => { applyStyle(); requestGenerate(); };
+  $('swap').onclick = () => {
+    const a = $('fg').value; $('fg').value = $('bg').value; $('bg').value = a;
+    applyStyle(); requestGenerate(); saveSettings();
+  };
+  document.querySelectorAll('.preset').forEach(b => b.onclick = () => {
+    $('fg').value = b.dataset.fg; $('bg').value = b.dataset.bg;
+    applyStyle(); requestGenerate(); saveSettings();
+  });
+
+  /* ── сохранение настроек между сессиями ── */
+  const PERSIST = ['cols','bright','contrast','gamma','invert','charset','customChars','font','fsize','fweight','lheight','lspace','fg','bg'];
+  function saveSettings(){
+    const o = {};
+    PERSIST.forEach(id => { const el = $(id); o[id] = el.type === 'checkbox' ? el.checked : el.value; });
+    try{ localStorage.setItem('nabor-settings', JSON.stringify(o)); }catch(e){}
+  }
+  function loadSettings(){
+    let o = null;
+    try{ o = JSON.parse(localStorage.getItem('nabor-settings')); }catch(e){}
+    if(!o) return;
+    PERSIST.forEach(id => {
+      if(!(id in o)) return;
+      const el = $(id);
+      if(el.type === 'checkbox') el.checked = !!o[id];
+      else el.value = o[id];
+    });
+    // сохранённый пользовательский шрифт недоступен после перезагрузки страницы
+    if($('font').selectedIndex < 0) $('font').selectedIndex = 0;
+    if($('charset').selectedIndex < 0) $('charset').selectedIndex = 0;
+    $('customChars').style.display = $('charset').value === 'custom' ? 'block' : 'none';
+    syncOutputs();
+  }
+  const aside = document.querySelector('aside');
+  aside.addEventListener('input', saveSettings);
+  aside.addEventListener('change', saveSettings);
+  loadSettings();
+  applyStyle();
+
+  /* ── свой шрифт ── */
+  $('fontPick').onclick = () => $('fontFile').click();
+  $('fontFile').onchange = async e => {
+    const f = e.target.files[0];
+    if(!f) return;
+    try{
+      const buf = await f.arrayBuffer();
+      const name = 'UserFont' + (++state.customFonts);
+      const face = new FontFace(name, buf);
+      await face.load();
+      document.fonts.add(face);
+      const opt = document.createElement('option');
+      opt.value = "'" + name + "',monospace";
+      opt.textContent = '◆ ' + f.name.replace(/\.(ttf|otf|woff2?)$/i, '');
+      $('font').appendChild(opt);
+      $('font').value = opt.value;
+      applyStyle();
+      saveSettings();
+    }catch(err){
+      alert('Не удалось прочитать шрифт: ' + err.message);
+    }
+    e.target.value = '';
+  };
+
+  /* ── экспорт ── */
+  function download(blob, name){
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+  function getText(){
+    return out.innerText.replace(/\n+$/, '');
+  }
+  /* ширина самого широкого символа текста — для нестандартных наборов */
+  function maxCharWidth(ctx, text){
+    let w = 0;
+    for(const ch of new Set(text.replace(/\n/g, ''))) w = Math.max(w, ctx.measureText(ch).width);
+    return w || ctx.measureText('M').width;
+  }
+
+  $('copy').onclick = async () => {
+    const t = getText();
+    if(!t) return;
+    try{
+      await navigator.clipboard.writeText(t);
+      flash('Скопировано в буфер обмена');
+    }catch(e){
+      flash('Не удалось скопировать');
+    }
+  };
+
+  $('dl-txt').onclick = () => {
+    if(!getText()) return;
+    download(new Blob([getText()], { type: 'text/plain;charset=utf-8' }), 'ascii.txt');
+  };
+
+  $('dl-png').onclick = () => {
+    const text = getText();
+    if(!text) return;
+    const lines = text.split('\n');
+    const size = +$('fsize').value;
+    const lh = size * (+$('lheight').value / 100);
+    const weight = $('fweight').value;
+    const family = $('font').value;
+    const ls = +$('lspace').value;
+    const scale = 3;                                   // экспорт в 3× для чёткости
+    const cv = document.createElement('canvas');
+    const ctx = cv.getContext('2d');
+    ctx.font = weight + ' ' + size + 'px ' + family;
+    const charW = maxCharWidth(ctx, text) + ls;
+    const maxLen = Math.max(...lines.map(l => l.length));
+    const pad = size * 2;
+    cv.width  = Math.ceil((maxLen * charW + pad * 2) * scale);
+    cv.height = Math.ceil((lines.length * lh + pad * 2) * scale);
+    ctx.scale(scale, scale);
+    ctx.fillStyle = $('bg').value;
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.font = weight + ' ' + size + 'px ' + family;
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = $('fg').value;
+    lines.forEach((line, y) => {
+      if(ls === 0){
+        ctx.fillText(line, pad, pad + y * lh);
+      }else{
+        for(let x = 0; x < line.length; x++)
+          ctx.fillText(line[x], pad + x * charW, pad + y * lh);
+      }
+    });
+    cv.toBlob(b => download(b, 'ascii.png'), 'image/png');
+  };
+
+  $('dl-svg').onclick = () => {
+    const text = getText();
+    if(!text) return;
+    const lines = text.split('\n');
+    const size = +$('fsize').value;
+    const lh = size * (+$('lheight').value / 100);
+    const family = $('font').value.replace(/"/g, "'");
+    const weight = $('fweight').value;
+    const cv = document.createElement('canvas').getContext('2d');
+    cv.font = weight + ' ' + size + 'px ' + family;
+    const charW = maxCharWidth(cv, text) + +$('lspace').value;
+    const maxLen = Math.max(...lines.map(l => l.length));
+    const pad = size * 2;
+    const W = Math.ceil(maxLen * charW + pad * 2);
+    const H = Math.ceil(lines.length * lh + pad * 2);
+    const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    let body = '';
+    lines.forEach((line, y) => {
+      body += '<text x="' + pad + '" y="' + (pad + y * lh + size * 0.8).toFixed(1) + '" xml:space="preserve">' + esc(line) + '</text>\n';
+    });
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">\n' +
+      '<rect width="100%" height="100%" fill="' + $('bg').value + '"/>\n' +
+      '<g font-family="' + esc(family) + '" font-size="' + size + '" font-weight="' + weight + '" letter-spacing="' + $('lspace').value + '" fill="' + $('fg').value + '" style="white-space:pre">\n' +
+      body + '</g>\n</svg>';
+    download(new Blob([svg], { type: 'image/svg+xml' }), 'ascii.svg');
+  };
+
+})();
+</script>
+</body>
+</html>
