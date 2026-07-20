@@ -1,11 +1,9 @@
-# НАБОР / nabor
+# ascii_creator
 
 **ASCII image generator that runs entirely in the browser.**
 Drop an image → get editable ASCII art → tweak it character by character → export.
 
-*Набор* — Russian for both a typesetter's "composition" and a "character set". Which is exactly what this does.
-
-**[→ Live demo](https://sashamind.github.io/nabor/)**
+**[→ Live demo](https://sashamind.github.io/ascii_creator/)**
 
 ---
 

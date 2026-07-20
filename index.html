@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="ASCII-генератор из картинок, работает целиком в браузере: загрузи изображение, получи редактируемую ASCII-графику, экспортируй в TXT, PNG или SVG.">
-<meta property="og:title" content="НАБОР — ASCII-генератор из картинок">
+<meta property="og:title" content="ascii_creator — ASCII-генератор из картинок">
 <meta property="og:description" content="Картинка → символы → правь как текст → скачивай. Без зависимостей, один HTML-файл.">
 <meta property="og:type" content="website">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%231B1A18'/><text x='8' y='12.5' text-anchor='middle' font-family='monospace' font-size='11' fill='%2333FF66'>@</text></svg>">
-<title>НАБОР — ASCII-генератор из картинок</title>
+<title>ascii_creator — ASCII-генератор из картинок</title>
 <style>
   :root{
     --paper:#F2EFE8;
@@ -157,7 +157,7 @@
 <body>
 
 <header>
-  <div class="logo">НАБОР<b>/</b>ascii<i>_</i></div>
+  <div class="logo">ascii<b>_</b>creator<i>_</i></div>
   <div class="hint">картинка → символы → правь как текст → скачивай</div>
   <div class="exports">
     <button id="copy" title="Скопировать в буфер обмена">⧉ COPY</button>
@@ -526,11 +526,11 @@
   function saveSettings(){
     const o = {};
     PERSIST.forEach(id => { const el = $(id); o[id] = el.type === 'checkbox' ? el.checked : el.value; });
-    try{ localStorage.setItem('nabor-settings', JSON.stringify(o)); }catch(e){}
+    try{ localStorage.setItem('ascii_creator-settings', JSON.stringify(o)); }catch(e){}
   }
   function loadSettings(){
     let o = null;
-    try{ o = JSON.parse(localStorage.getItem('nabor-settings')); }catch(e){}
+    try{ o = JSON.parse(localStorage.getItem('ascii_creator-settings')); }catch(e){}
     if(!o) return;
     PERSIST.forEach(id => {
       if(!(id in o)) return;
@@ -551,7 +551,7 @@
       else if(el.tagName === 'SELECT') el.selectedIndex = 0;
       else el.value = el.defaultValue;
     });
-    try{ localStorage.removeItem('nabor-settings'); }catch(e){}
+    try{ localStorage.removeItem('ascii_creator-settings'); }catch(e){}
     state.targetW = null;
     $('customChars').style.display = 'none';
     syncOutputs();
